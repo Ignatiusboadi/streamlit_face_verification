@@ -45,6 +45,30 @@ if 'delete_username' not in st.session_state:
     st.session_state['delete_username'] = ''
 
 
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as file:
+        encoded_image = base64.b64encode(file.read()).decode()
+    st.markdown(
+        f"""
+         <style>
+         .stApp {{
+             background-image: url("data:image/png;base64,{encoded_image}");
+             background-size: cover;
+             background-position: center;
+         }}
+         </style>
+         """,
+        unsafe_allow_html=True
+    )
+
+
+# Add your local background image here
+add_bg_from_local("assets/face_ver.png")  # Replace with your image path
+
+# Title for the login page
+st.markdown("<h1 style='text-align: center; color: white;'>FACE RECOGNITION SYSTEM</h1>", unsafe_allow_html=True)
+
+
 def capture_image(param):
     save_path = 'captured_image.jpg'
     img_file = st.camera_input(param)
@@ -90,8 +114,6 @@ def enroll_user(username, password, email, fullname, filename):
                 'Authorization': f"Bearer {bearer_token}"
             }
             response = requests.post(f"{API_URL}/enroll", headers=headers, data=data, files=files)
-            print(data)
-            print(files)
             if response.status_code == 200:
                 st.success(f'{fullname} enrolled successfully.')
                 os.remove(filename)
@@ -176,7 +198,6 @@ def login_page():
 def enrollment_tab():
     st.header("User Enrollment")
 
-    # Render input fields with session state
     enroll_username = st.text_input("Username", value=st.session_state['enroll_username'], key="enroll_username")
     enroll_password = st.text_input("Password", type="password", value=st.session_state['enroll_password'],
                                     key="enroll_password")
@@ -189,6 +210,7 @@ def enrollment_tab():
     if st.button("Enroll"):
         if image_data:
             response = enroll_user(enroll_username, enroll_password, enroll_email, enroll_fullname, image_data)
+            print(response)
             try:
                 if response.status_code == 200:
                     st.success("Enrollment successful!")
@@ -243,7 +265,6 @@ def update_delete_tab():
 
 
 def main_dashboard():
-    st.title("FACE VERIFICATION SYSTEM")
 
     tabs = st.tabs(["Enrollment", "Verification", "Update/Delete User"])
 
@@ -265,6 +286,25 @@ def main():
         main_dashboard()
     else:
         login_page()
+
+
+st.markdown("""
+    <style>
+    .stButton>button {
+        font-size: 16px;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    .stTextInput>div>div>input {
+        border-radius: 10px;
+        font-size: 17px;
+    }
+    .stSelectbox>div>div>input {
+        border-radius: 10px;
+        font-size: 17px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 if __name__ == '__main__':
