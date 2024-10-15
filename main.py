@@ -1,4 +1,8 @@
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+from faker import Faker
+from google.cloud import storage
 
 from PIL import Image
 from streamlit.errors import StreamlitAPIException
@@ -41,6 +45,19 @@ if 'update_email' not in st.session_state:
 if 'delete_username' not in st.session_state:
     st.session_state['delete_username'] = ''
 
+load_dotenv()
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+
+
+def upload_to_gcp(source_file_name, destination_folder):
+    bucket_name = 'face-verification-images'
+    destination_blob_name = f'{destination_folder}/{source_file_name}'
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_filename(source_file_name)
+    print(f"File {source_file_name} uploaded to {destination_blob_name}.")
+
 
 def add_bg_from_local(image_file):
     with open(image_file, "rb") as file:
@@ -65,7 +82,8 @@ st.markdown("<h1 style='text-align: center; color: white;'>FACE RECOGNITION SYST
 
 
 def capture_image(param):
-    save_path = 'captured_image.jpg'
+    name = Faker().name()
+    save_path = f'{name}.jpg'
     img_file = st.camera_input(param)
 
     if img_file is not None:
@@ -109,7 +127,10 @@ def enroll_user(username, password, email, fullname, filename):
                 'Authorization': f"Bearer {bearer_token}"
             }
             response = requests.post(f"{API_URL}/enroll", headers=headers, data=data, files=files)
-            print('enrollment response', response.json(), response.status_code == 200)
+            try:
+                upload_to_gcp(filename, 'enrollment-images')
+            except Exception as e:
+                pass
             if response.status_code == 200:
                 try:
                     st.session_state.enroll_username = ''
@@ -119,7 +140,10 @@ def enroll_user(username, password, email, fullname, filename):
                 except StreamlitAPIException:
                     pass
                 st.success(f'{fullname} enrolled successfully.')
-
+                try:
+                    os.remove(filename)
+                except Exception as e:
+                    pass
                 return
             else:
                 st.error(f"{response.json()['detail']} Please try again.")
@@ -222,13 +246,19 @@ def verification_tab():
             if response.status_code == 200:
                 if response.json()['message']:
                     st.success(f"Verified successfully at {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}")
-                    return
+                    # return
                 else:
                     st.error(f"Could not verify you. Try again or contact security.")
-                    return
+                    # return
             else:
                 st.error("Verification failed. Please try again.")
-                return
+                # return
+
+        try:
+            os.remove(image_data)
+        except Exception as e:
+            pass
+        return
 
 
 def update_tab():
