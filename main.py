@@ -1,17 +1,15 @@
-from datetime import time, datetime
+from datetime import datetime
 
-from faker import Faker
-from io import BytesIO
 from PIL import Image
 from streamlit.errors import StreamlitAPIException
 import base64
-import os
-import re
 import requests
 import streamlit as st
 
 API_URL = 'https://face-recognition-image-963201605868.us-central1.run.app'
+# API_URL = 'http://127.0.0.1:8000'
 
+st.set_page_config(page_title="Face Verification")
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 if 'stored_token' not in st.session_state:
@@ -22,7 +20,6 @@ if 'authenticated' not in st.session_state:
 if 'stored_token' not in st.session_state:
     st.session_state['stored_token'] = None
 
-# Initialize form fields session state (for enrollment, update, delete)
 if 'enroll_username' not in st.session_state:
     st.session_state['enroll_username'] = ''
 if 'enroll_password' not in st.session_state:
@@ -62,10 +59,8 @@ def add_bg_from_local(image_file):
     )
 
 
-# Add your local background image here
 add_bg_from_local("assets/face_ver.png")  # Replace with your image path
 
-# Title for the login page
 st.markdown("<h1 style='text-align: center; color: white;'>FACE RECOGNITION SYSTEM</h1>", unsafe_allow_html=True)
 
 
@@ -114,21 +109,24 @@ def enroll_user(username, password, email, fullname, filename):
                 'Authorization': f"Bearer {bearer_token}"
             }
             response = requests.post(f"{API_URL}/enroll", headers=headers, data=data, files=files)
+            print('enrollment response', response.json(), response.status_code == 200)
             if response.status_code == 200:
-                st.success(f'{fullname} enrolled successfully.')
-                os.remove(filename)
                 try:
                     st.session_state.enroll_username = ''
                     st.session_state.enroll_password = ''
                     st.session_state.enroll_email = ''
                     st.session_state.enroll_fullname = ''
                 except StreamlitAPIException:
-                    return st.success(f'{fullname} enrolled successfully.')
+                    pass
+                st.success(f'{fullname} enrolled successfully.')
+
+                return
             else:
-                st.error("Enrollment failed. Please try again.")
-            return response
+                st.error(f"{response.json()['detail']} Please try again.")
+                return
     except PermissionError:
-        st.error('Kindly refresh the page and try again. Sorry for the inconvenience.')
+        st.error('Kindly refresh the page and try again.')
+        return
 
 
 def verify_user(image_data):
@@ -159,6 +157,7 @@ def update_user(username, name, password, email):
         'email': email
     }
     response = requests.put(update_url, data=data, headers=headers)
+    print('update response', response, response.status_code)
     return response
 
 
@@ -170,7 +169,7 @@ def delete_user(username):
     unenroll_url = f"{API_URL}/unenroll"
     data = {'username': username}
     response = requests.delete(unenroll_url, headers=headers, data=data)
-    # response = requests.delete(f"{API_URL}/delete/{username}")
+    print('delete response', response, response.status_code)
     return response
 
 
@@ -189,7 +188,6 @@ def login_page():
     if st.button("Authenticate"):
         if token_input == st.session_state.get('stored_token', ''):
             st.session_state['authenticated'] = True
-            # st.success("Authentication successful! Proceed to dashboard.")
             st.rerun()
         else:
             st.error("Invalid token.")
@@ -209,15 +207,7 @@ def enrollment_tab():
 
     if st.button("Enroll"):
         if image_data:
-            response = enroll_user(enroll_username, enroll_password, enroll_email, enroll_fullname, image_data)
-            print(response)
-            try:
-                if response.status_code == 200:
-                    st.success("Enrollment successful!")
-                else:
-                    st.error("Enrollment failed. Please try again.")
-            except AttributeError:
-                st.error("Failed to generate token. Please check your credentials.")
+            enroll_user(enroll_username, enroll_password, enroll_email, enroll_fullname, image_data)
 
 
 def verification_tab():
@@ -229,16 +219,19 @@ def verification_tab():
     if st.button("Verify"):
         if image_data:
             response = verify_user(image_data)
-            if response.status_code == 200 and 'recognized' in response.json():
-                if response.json()['recognized']:
+            if response.status_code == 200:
+                if response.json()['message']:
                     st.success(f"Verified successfully at {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}")
+                    return
                 else:
                     st.error(f"Could not verify you. Try again or contact security.")
+                    return
             else:
                 st.error("Verification failed. Please try again.")
+                return
 
 
-def update_delete_tab():
+def update_tab():
     st.header("Update User")
 
     update_username = st.text_input("Update Username", key="update_username")
@@ -250,9 +243,13 @@ def update_delete_tab():
         response = update_user(update_username, update_name, update_password, update_email)
         if response.status_code == 200:
             st.success("User information updated!")
+            return
         else:
             st.error("Failed to update user. Please try again.")
+            return
 
+
+def delete_tab():
     st.header("Delete User")
     delete_username = st.text_input("Delete Username", key="delete_username")
 
@@ -260,13 +257,14 @@ def update_delete_tab():
         response = delete_user(delete_username)
         if response.status_code == 200:
             st.success(f"User {delete_username} deleted!")
+            return
         else:
             st.error("Failed to delete user. Please try again.")
+            return
 
 
 def main_dashboard():
-
-    tabs = st.tabs(["Enrollment", "Verification", "Update/Delete User"])
+    tabs = st.tabs(["Enrollment", "Verification", "Update User", 'Delete User'])
 
     with tabs[0]:
         enrollment_tab()
@@ -275,7 +273,10 @@ def main_dashboard():
         verification_tab()
 
     with tabs[2]:
-        update_delete_tab()
+        update_tab()
+
+    with tabs[3]:
+        delete_tab()
 
 
 def main():
@@ -286,25 +287,6 @@ def main():
         main_dashboard()
     else:
         login_page()
-
-
-st.markdown("""
-    <style>
-    .stButton>button {
-        font-size: 16px;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    .stTextInput>div>div>input {
-        border-radius: 10px;
-        font-size: 17px;
-    }
-    .stSelectbox>div>div>input {
-        border-radius: 10px;
-        font-size: 17px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 
 if __name__ == '__main__':
