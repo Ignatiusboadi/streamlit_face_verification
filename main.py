@@ -81,9 +81,8 @@ add_bg_from_local("assets/face_ver.png")  # Replace with your image path
 st.markdown("<h1 style='text-align: center; color: white;'>FACE RECOGNITION SYSTEM</h1>", unsafe_allow_html=True)
 
 
-def capture_image(param):
-    name = Faker().name()
-    save_path = f'{name}.jpg'
+def capture_image(param, enroll_username='verify'):
+    save_path = f'{enroll_username}.jpg'
     img_file = st.camera_input(param)
 
     if img_file is not None:
@@ -227,7 +226,7 @@ def enrollment_tab():
     enroll_fullname = st.text_input("Full Name", value=st.session_state['enroll_fullname'], key="enroll_fullname")
 
     st.write("Capture User's Face")
-    image_data = capture_image('Scan face to enroll.')
+    image_data = capture_image('Scan face to enroll.', enroll_username)
 
     if st.button("Enroll"):
         if image_data:
