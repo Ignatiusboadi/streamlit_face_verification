@@ -10,7 +10,7 @@ import base64
 import requests
 import streamlit as st
 
-API_URL = 'https://face-recognition-image-963201605868.us-central1.run.app'
+API_URL = 'https://verify-face-963201605868.us-central1.run.app'
 # API_URL = 'http://127.0.0.1:8000'
 
 st.set_page_config(page_title="Face Verification")
